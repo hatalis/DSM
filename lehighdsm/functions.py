@@ -1,24 +1,17 @@
-'''
-This function creates 1 month worth of new load data using block bootstrap from a template dataset.
-'''
 
 import pandas as pd
 import numpy as np
-from statsmodels.tsa.arima_process import ArmaProcess
+import matplotlib.pyplot as plt
 
 def load(experiment):
 
     filename = experiment['filename']
-
     dateparse = lambda dates: pd.datetime.strptime(dates, '%m/%d/%Y %H:%M')
     raw_data = pd.read_csv(filename, parse_dates=[0], index_col=0, date_parser=dateparse)
-
     kWh = raw_data.resample('H').apply('sum') # convert data from kW to kWh
-
     experiment['raw_data'] = kWh
 
     return experiment
-
 
 
 def create_homes(df, template, k):
@@ -34,12 +27,10 @@ def create_homes(df, template, k):
     return new_home
 
 
-
 def simulate_city(experiment):
 
     raw_data = experiment['raw_data']
     N = experiment['N']
-
     homes = ['A', 'B', 'C', 'D', 'E', 'F', 'G']  # list of template homes
     city = raw_data['A']  # we start simulating a city with 1 home
 
@@ -50,17 +41,13 @@ def simulate_city(experiment):
     for i in range(N-1):
         city = create_homes(raw_data, templates[i], i).join(city, how='inner')
 
-
     # sum the data together to get total load
     total_load = city.sum(axis=1)
 
     experiment['city'] = city
     experiment['total_load'] = total_load
 
-    # total.to_csv('city.csv', sep=',')
-
     return experiment
-
 
 
 def simulate_load_price(experiment):
@@ -70,40 +57,48 @@ def simulate_load_price(experiment):
     alpha = experiment['alpha']
     epsilon_D = experiment['epsilon_D']
     epsilon_P = experiment['epsilon_P']
-    total_load = experiment['total_load']
+    omega = experiment['omega']
     kappa = experiment['kappa']
     beta = experiment['beta']
+    T = experiment['T']
 
-    T = 24*7
     P = np.zeros((T,1))
     L = np.zeros((T,N))
     total_L = np.zeros((T,1))
 
-    # Simulate u = AR(1) with phi=-0.6
-    ma = np.array([1])
-    ar = np.array([1, 0.6])
-    AR_object = ArmaProcess(ar, ma)
-    u = AR_object.generate_sample(nsample=T)
-
-
-    city = city.values # convert from pandas to numpy array
-
-    L[0,:] = city[0,:]
+    phi = city.values # convert from pandas to numpy array
+    L[0,:] = phi[0,:] # set 1st L value from phi
     total_L[0] = np.sum(L[0,:])
 
-    kappa = 0
     for t in range(1,T):
-        L_hat = total_L[t-1]
-        P[t] = beta * (alpha - L_hat)**epsilon_P + u[t]*0
-
-        L[t,:] =  kappa*(100*(P[t]**epsilon_D)) + (1 - kappa) * city[t, :]
+        L_hat = total_L[t-1] # persistance forecast
+        P[t] = beta * (alpha - L_hat)**epsilon_P
+        L[t,:] =  kappa*(omega*(P[t]**epsilon_D)) + (1 - kappa) * phi[t, :]
         total_L[t] = np.sum(L[t,:])
-
-
-
     P[0] = P[1]
+    total_L[0] = total_L[1]
+
     experiment['P'] = P
     experiment['L'] = L
     experiment['total_L'] = total_L
 
     return experiment
+
+
+def output_results(experiment):
+
+    P = experiment['P']
+    total_L = experiment['total_L']
+
+    plt.figure(1)
+    plt.subplot(211)
+    plt.plot(P[3:], color='darkorange')
+    plt.ylim(1, 60)
+    plt.ylabel('Price (USD)')
+    plt.subplot(212)
+    plt.plot(total_L)
+    plt.xlabel('Time (hr)')
+    plt.ylabel('Total Load (kWh)')
+    plt.ylim(1, 40000)
+
+    return None
