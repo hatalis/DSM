@@ -18,8 +18,8 @@ np.random.seed(1)
 experiment = {}
 experiment['N'] = 100 # number of homes to simulate
 experiment['filename'] = 'data/home_all.csv'
-experiment['alpha'] = 100 # max load
-experiment['beta'] = 100 # max price
+experiment['alpha'] = 20_000 # max load tolerated by SO
+experiment['beta'] = 1_000 # price for max load
 experiment['epsilon_D'] = -0.6 # elasticity of load
 experiment['epsilon_P'] = -0.4 # elasticity of price
 
@@ -36,8 +36,9 @@ L = experiment['L']
 total_L = experiment['total_L']
 
 plt.figure(1)
+plt.subplot(211)
 plt.plot(P)
-plt.figure(2)
+plt.subplot(212)
 plt.plot(total_L)
 
 
