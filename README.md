@@ -29,7 +29,7 @@ matplotlib
 ```
 
 ## Example Simulation
-```
+```python
 import lehighdsm.functions as dsm
 import numpy as np
 
