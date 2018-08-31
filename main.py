@@ -1,57 +1,39 @@
 '''
 This script loads in a csv file of template home data.
 Using those homes, a city of homes is simulated using the block bootstrap method.
+This simulation is used as the phi distribution.
+Then load and price data is simulated for DSM.
 
 By: Kostas Hatalis
 '''
 
 import lehighdsm.functions as dsm
-import matplotlib.pyplot as plt
 import numpy as np
 import time
+import matplotlib.pyplot as plt
 
 start_time = time.time()
 np.random.seed(1)
 
-
-# simulate initial city of N homes without DSM
+# simulation parameters
 experiment = {}
-experiment['N'] = 100 # number of homes to simulate
 experiment['filename'] = 'data/home_all.csv'
-experiment['alpha'] = 20_000 # max load tolerated by SO
+experiment['N'] = 200 # number of homes to simulate
+experiment['alpha'] = 40_000 # max load tolerated by SO
 experiment['beta'] = 1_000 # price for max load
+experiment['omega'] = 100 # max load allowed by DSM
 experiment['epsilon_D'] = -0.6 # elasticity of load
 experiment['epsilon_P'] = -0.4 # elasticity of price
+experiment['T'] = 24*7 # total time to simulate
 
 # % of load of each home participating in DSM
 experiment['kappa'] = np.random.uniform(low=0.0, high=1.0, size=experiment['N'])
 
-
-experiment = dsm.load(experiment)
-experiment = dsm.simulate_city(experiment)
+# run simulation
+experiment = dsm.load(experiment) # load template homes
+experiment = dsm.simulate_city(experiment) # simulate phi
 experiment = dsm.simulate_load_price(experiment)
-
-P = experiment['P']
-L = experiment['L']
-total_L = experiment['total_L']
-
-plt.figure(1)
-plt.subplot(211)
-plt.plot(P)
-plt.subplot(212)
-plt.plot(total_L)
-
-
-
-
-
-
-
-# plot data
-# plt.plot(total.loc[(df.index.day == 1)]) # plot 1 day
-# plt.plot(total_load) # plot whole month
-# plt.ylabel('Total Load')
-# plt.xlabel('Time')
+dsm.output_results(experiment)
 
 # print runtime to console
 print('Runtime in seconds = {:,.4f}'.format(float(time.time() - start_time)))
