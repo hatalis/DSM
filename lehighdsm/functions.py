@@ -8,7 +8,7 @@ def load(experiment):
     filename = experiment['filename']
     dateparse = lambda dates: pd.datetime.strptime(dates, '%m/%d/%Y %H:%M')
     raw_data = pd.read_csv(filename, parse_dates=[0], index_col=0, date_parser=dateparse)
-    kWh = raw_data.resample('H').apply('sum') # convert data from kW to kWh
+    kWh = raw_data.resample('H').apply('sum')/60 # convert data from kW to kWh (average the power within 1 hour)
     experiment['raw_data'] = kWh
 
     return experiment
@@ -46,59 +46,80 @@ def simulate_city(experiment):
 
     experiment['city'] = city
     experiment['total_load'] = total_load
-
+    print(np.max(total_load))
     return experiment
 
 
 def simulate_load_price(experiment):
 
     N = experiment['N']
-    city = experiment['city']
+    phi = experiment['city'].values
     alpha = experiment['alpha']
     epsilon_D = experiment['epsilon_D']
-    epsilon_P = experiment['epsilon_P']
-    omega = experiment['omega']
+    L_target = experiment['L_target']
     kappa = experiment['kappa']
     beta = experiment['beta']
     T = experiment['T']
 
+    L_hat_period = 300
+    P_target = L_hat_period/L_target
+    epsilon_P = np.log(P_target/beta) / np.log(alpha - L_hat_period)
+
     P = np.zeros((T,1))
     L = np.zeros((T,N))
-    total_L = np.zeros((T,1))
-
-    phi = city.values # convert from pandas to numpy array
-    L[0,:] = phi[0,:] # set 1st L value from phi
-    total_L[0] = np.sum(L[0,:])
+    L_total = np.zeros((T,1))
 
     for t in range(1,T):
-        L_hat = total_L[t-1] # persistance forecast
-        P[t] = beta * (alpha - L_hat)**epsilon_P
-        L[t,:] =  kappa*(omega*(P[t]**epsilon_D)) + (1 - kappa) * phi[t, :]
-        total_L[t] = np.sum(L[t,:])
-    P[0] = P[1]
-    total_L[0] = total_L[1]
+        # SO defines price first
+        L_hat = load_forecast(t, L_total, P)
+        P[t] = beta * ((alpha - L_hat)**epsilon_P)
+        # individual household defines load from DSM+phi
+        L[t,:] =  kappa*(phi[t, :]*(P[t]**epsilon_D)) + (1 - kappa) * phi[t, :]
+        L_total[t] = np.sum(L[t,:])
+        # if total load > alpha, shed load
+        if L_total[t] > alpha:
+            L_total[t] = alpha-1
 
-    experiment['P'] = P
+    experiment['P_target'] = P_target
+    experiment['L_target'] = L_target
+    experiment['epsilon_P'] = epsilon_P
+    experiment['P'] = P/100 # convert cents to USD
     experiment['L'] = L
-    experiment['total_L'] = total_L
+    experiment['L_total'] = L_total
 
     return experiment
+
+
+def load_forecast(t, L_total, P):
+    L_hat = float(L_total[t-1]) # persistance forecast
+    return L_hat
 
 
 def output_results(experiment):
 
     P = experiment['P']
-    total_L = experiment['total_L']
+    L_total = experiment['L_total']
+    epsilon_P = experiment['epsilon_P']
+    L_target = experiment['L_target']
+    P_target = experiment['P_target']
+
+    print('Target Load =', L_target)
+    print('Target Price =', P_target)
+    print('Elasticity of price =',epsilon_P)
+    print('=========================')
+    print('Actual Price =', np.mean(P))
+    print('Actual Load =', np.mean(L_total))
+
 
     plt.figure(1)
     plt.subplot(211)
-    plt.plot(P[3:], color='darkorange')
-    plt.ylim(1, 60)
-    plt.ylabel('Price (USD)')
+    plt.plot(P, color='darkorange')
+    # plt.ylim(1, 60)
+    plt.ylabel('Price (USD/kWh)')
     plt.subplot(212)
-    plt.plot(total_L)
+    plt.plot(L_total)
     plt.xlabel('Time (hr)')
     plt.ylabel('Total Load (kWh)')
-    plt.ylim(1, 40000)
+    # plt.ylim(1, 40000)
 
     return None
