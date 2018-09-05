@@ -19,15 +19,16 @@ np.random.seed(1)
 experiment = {}
 experiment['filename'] = 'data/home_all.csv'
 experiment['N'] = 200 # number of homes to simulate
-experiment['alpha'] = 40_000 # max load tolerated by SO
-experiment['beta'] = 1_000 # price for max load
-experiment['omega'] = 100 # max load allowed by DSM
-experiment['epsilon_D'] = -0.6 # elasticity of load
-experiment['epsilon_P'] = -0.4 # elasticity of price
 experiment['T'] = 24*7 # total time to simulate
+experiment['kappa'] = 0 #np.random.uniform(low=0.0, high=1.0, size=experiment['N'])
 
-# % of load of each home participating in DSM
-experiment['kappa'] = np.random.uniform(low=0.0, high=1.0, size=experiment['N'])
+# Parameters for SO to determine electricity prices
+experiment['alpha'] = 800 # max load tolerated by SO
+experiment['beta'] = 10_000 # price for max load in cents
+
+experiment['L_target'] = 100 # target load
+
+experiment['epsilon_D'] = -1 # elasticity of load
 
 # run simulation
 experiment = dsm.load(experiment) # load template homes
