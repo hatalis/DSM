@@ -44,11 +44,14 @@ def simulate_city(experiment):
     # sum the data together to get total load
     total_load = city.sum(axis=1)
 
+    # total_load.to_csv('total_load.csv', sep=',')
+
     experiment['city'] = city
     experiment['total_load'] = total_load
-    print(np.max(total_load))
+
     return experiment
 
+# from statsmodels.graphics.tsaplots import plot_acf
 
 def simulate_load_price(experiment):
 
@@ -56,70 +59,151 @@ def simulate_load_price(experiment):
     phi = experiment['city'].values
     alpha = experiment['alpha']
     epsilon_D = experiment['epsilon_D']
+    epsilon_P = experiment['epsilon_P']
+    L_hat_period = experiment['L_hat_period']
     L_target = experiment['L_target']
     kappa = experiment['kappa']
     beta = experiment['beta']
     T = experiment['T']
+    total_load = experiment['total_load']
+    method = experiment['method']
+    window = experiment['window']
 
-    L_hat_period = 300
+    # plot_acf(total_load.diff(periods=1).values[1:], alpha=0.05, lags=48)
+    # plt.show()
+
     P_target = L_hat_period/L_target
-    epsilon_P = np.log(P_target/beta) / np.log(alpha - L_hat_period)
+    if epsilon_P == None:
+        epsilon_P = np.log(P_target/beta) / np.log(alpha - L_hat_period)
 
-    P = np.zeros((T,1))
+    P = np.ones((T,1))*0
     L = np.zeros((T,N))
     L_total = np.zeros((T,1))
+    L_hat = np.zeros((T, 1))
+    P_perfect = np.ones((T, 1))*P_target
+
+    # P[100:150] = 0.01
+    # attack parameters
+    pa = 0.4
+    attack, attack_prob, = [0, 1], [1-pa, pa]
+    attack_outcome = np.random.choice(attack, size=[T,N], p=attack_prob)
 
     for t in range(1,T):
         # SO defines price first
-        L_hat = load_forecast(t, L_total, P)
-        P[t] = beta * ((alpha - L_hat)**epsilon_P)
+        if t > window:
+            L_hat[t] = load_forecast(t, L_total[:t], P[:t], method, window)
+            P[t] = beta * ((alpha - L_hat[t])**epsilon_P)
+
         # individual household defines load from DSM+phi
-        L[t,:] =  kappa*(phi[t, :]*(P[t]**epsilon_D)) + (1 - kappa) * phi[t, :]
-        L_total[t] = np.sum(L[t,:])
+        L[t, :] =  kappa*(phi[t, :]*(P[t]**epsilon_D)) + (1 - kappa) * phi[t, :]
+        # L[t, 0] =  kappa*(L_hat[t]*(P[t]**epsilon_D)) + (1 - kappa) *L_hat[t]
+
+        # # random attack
+        amount = 0.00
+        L[t, :] = L[t, :] * (1+attack_outcome[t, :]*amount)
+        # # attack on midnight
+        # if t % 24 == 0:
+        #     L[t, :] = L[t, :] * 0
+
         # if total load > alpha, shed load
+        L_total[t] = np.sum(L[t, :])
         if L_total[t] > alpha:
             L_total[t] = alpha-1
+
+    for t in range(window,T):
+        P_perfect[t] = beta * ((alpha - L_total[t])**epsilon_P)
+
 
     experiment['P_target'] = P_target
     experiment['L_target'] = L_target
     experiment['epsilon_P'] = epsilon_P
-    experiment['P'] = P/100 # convert cents to USD
-    experiment['L'] = L
+    experiment['P'] = P # convert cents to USD
+    experiment['L'] = L # individual user loads
     experiment['L_total'] = L_total
+    experiment['L_hat'] = L_hat
+    experiment['P_perfect'] = P_perfect
 
     return experiment
 
 
-def load_forecast(t, L_total, P):
-    L_hat = float(L_total[t-1]) # persistance forecast
+from statsmodels.tsa.statespace.sarimax import SARIMAX
+def load_forecast(t, L_total, P, method, window):
+
+    if method == 0: # persistance forecast
+        L_hat = float(L_total[-1])
+    elif method > 0:
+        if t > window:
+            if method == 1: # SARIMA
+                # print(np.shape(L_total[-1-window:]),t)
+                model = SARIMAX(L_total[-1-window:], order=(1,1,1), seasonal_order=(1,1,0,24),
+                                enforce_invertibility=False,enforce_stationarity=False)
+                model_fit = model.fit(disp=False)
+                L_hat = model_fit.forecast()
+            else: # SARIMAX
+                # print(t)
+                model = SARIMAX(L_total[-1-window:],  exog=P[-1-window:], order=(1,1,1), seasonal_order=(1,1,0,24),
+                                enforce_invertibility=False,enforce_stationarity=False)
+                model_fit = model.fit(disp=False)
+                L_hat = model_fit.forecast(exog=P[-1].reshape((1, 1)))
+        else:
+            L_hat = float(L_total[-1]) # persistance forecast
+
     return L_hat
 
-
+from sklearn.metrics import mean_squared_error
 def output_results(experiment):
 
-    P = experiment['P']
     L_total = experiment['L_total']
-    epsilon_P = experiment['epsilon_P']
     L_target = experiment['L_target']
-    P_target = experiment['P_target']
+    L_hat = experiment['L_hat']
+    epsilon_P = experiment['epsilon_P']
+    P = experiment['P'] / 100
+    P_target = experiment['P_target']/100
+    P_perfect = experiment['P_perfect']/100
+    window = experiment['window']
 
-    print('Target Load =', L_target)
-    print('Target Price =', P_target)
-    print('Elasticity of price =',epsilon_P)
     print('=========================')
-    print('Actual Price =', np.mean(P))
-    print('Actual Load =', np.mean(L_total))
+    print('Target Load = {:,.2f}'.format(np.mean(L_target)))
+    print('Actual Load = {:,.2f}'.format(np.mean(L_total)))
+    print('RMSE of Load Forecast vs Observed = ',np.sqrt(mean_squared_error(L_total[window:], L_hat[window:])))
+    print('=========================')
+    # print('Target Price = {:,.4f}'.format(P_target))
+    # print('Elasticity of Price = {:,.2f}'.format(epsilon_P))
+    print('Mean RTP = = {:,.4f}'.format(np.mean(P)))
+    print('RMSE of RTP vs Ideal Price = ',np.sqrt(mean_squared_error(P_perfect[window:], P[window:])))
+    print('=========================')
 
-
-    plt.figure(1)
+    plt.figure(figsize=(9,6))
     plt.subplot(211)
     plt.plot(P, color='darkorange')
-    # plt.ylim(1, 60)
+    # plt.plot(P_perfect, color='purple')
     plt.ylabel('Price (USD/kWh)')
+
+    # plt.legend(['Estimated Price','Ideal Price'],fancybox=True,framealpha=1.0,
+    #            shadow=True,ncol=3,loc='upper center', bbox_to_anchor=(0.5, 1.08))
+    # plt.ylim(0, 0.08)
+    # plt.axvline(x=window, color='black')
+    # plt.title('Elasticity of price = {:,.2f}'.format(epsilon_P))
+    # plt.axhline(y=P_target, color='r')
+    # plt.axhline(y=np.mean(P), linestyle='--', color='green')
+
+    # plt.subplots_adjust(hspace=10)
+    # plt.subplots_adjust(left=0.15)
+
+    plt.tight_layout()
     plt.subplot(212)
+    plt.subplots_adjust(bottom=0.1)
     plt.plot(L_total)
+    # plt.plot(L_hat)
     plt.xlabel('Time (hr)')
     plt.ylabel('Total Load (kWh)')
-    # plt.ylim(1, 40000)
+    plt.ylim(1, 1_000)
 
+    # plt.axhline(y=L_target, color='r')
+    # plt.axhline(y=np.mean(L_total), linestyle='--', color='blue')
+
+    # plt.legend(['Observed Load','Target Load','Mean Load'],fancybox=True,framealpha=1.0,
+    #            shadow=True,ncol=3,loc='upper center', bbox_to_anchor=(0.5, 1.01))
+    #
+    #  plt.axvline(x=window, color='black')
     return None
