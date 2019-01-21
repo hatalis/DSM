@@ -13,7 +13,7 @@ def split_data(experiment, scaling = None):
     X = experiment['X']
     experiment['scaling'] = scaling
     L_processed = experiment['L_processed']
-    X_test_SARIMA = experiment['X_test_SARIMA']
+    L_test_prediction = experiment['L_test_prediction']
 
     N_test = experiment['N_test']
     y = pd.DataFrame(data={'target': np.ravel(L_processed)})
@@ -36,7 +36,7 @@ def split_data(experiment, scaling = None):
     X_test = X_test.values
     y_test_true = y_test.values
 
-    y_test = X_test_SARIMA
+    y_test = L_test_prediction
 
 
     # apply scaling and convert scaled data back to pandas

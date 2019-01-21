@@ -6,12 +6,15 @@ By Kostas Hatalis
 # from tensorflow import set_random_seed
 # set_random_seed(2)
 
+import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 from keras.models import Sequential
 from keras.layers import Dense
 from keras import backend as K
 from keras import regularizers
+from sklearn.metrics import classification_report, accuracy_score, confusion_matrix
+import itertools
 K.set_floatx('float64')
 
 def QARNET_detector(experiment,test_method=0):
@@ -51,9 +54,25 @@ def QARNET_detector(experiment,test_method=0):
     history = model.fit(X_train, y_train, epochs=maxIter, verbose=0, batch_size=batch_size)
 
     # -------------------------------------- estimate quantiles of testing data
-    # Xt[20,0] = 1.5
-    # y_test[20] = 1.5
-    q_hat = model.predict(X_test) #+np.random.uniform(size=np.shape(Xt))
+    q_hat = model.predict(X_test)
+
+    LB = q_hat[:,0]
+    UB = q_hat[:,1]
+
+
+    y_true = experiment['y_true']
+    N_test = experiment['N_test']
+    L_test_attack = experiment['L_test_attack']
+
+    y_pred = np.zeros((N_test, 1))
+    for t in range(N_test):
+        if (L_test_attack[t] > UB[t]):
+            y_pred[t] = 1
+            print(t)
+
+    cnf_matrix = confusion_matrix(y_true, y_pred)
+    plot_confusion_matrix(cnf_matrix, ['$H_0$','$H_1$'], normalize=True)
+
 
     experiment['q_hat'] = q_hat
     experiment['costs'] = history.history['loss']
@@ -95,3 +114,36 @@ def pinball_loss(tau, y, q, alpha = 0.01, smooth_loss = 1, kappa=0, margin=0):
     return quantile_loss + penalty
 
 
+def plot_confusion_matrix(cm, classes,
+                          normalize=False,
+                          title='Confusion matrix',
+                          cmap=plt.cm.Blues):
+    """
+    This function prints and plots the confusion matrix.
+    Normalization can be applied by setting `normalize=True`.
+    """
+    if normalize:
+        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        print("Normalized confusion matrix")
+    else:
+        print('Confusion matrix, without normalization')
+
+    print(cm)
+
+    plt.imshow(cm, interpolation='nearest', cmap=cmap)
+    plt.title(title)
+    plt.colorbar()
+    tick_marks = np.arange(len(classes))
+    plt.xticks(tick_marks, classes, rotation=45)
+    plt.yticks(tick_marks, classes)
+
+    fmt = '.2f' if normalize else 'd'
+    thresh = cm.max() / 2.
+    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+        plt.text(j, i, format(cm[i, j], fmt),
+                 horizontalalignment="center",
+                 color="white" if cm[i, j] > thresh else "black")
+
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+    plt.tight_layout()

@@ -13,7 +13,7 @@ def output_PI_results(experiment):
     QS = experiment['QS']
     IS = experiment['IS']
     ACE = experiment['ACE']
-    PINC = experiment['PINC']
+    PICP = experiment['PICP']
     plot_results = experiment['plot_results']
     print_cost = experiment['print_cost']
     costs = experiment['costs']
@@ -22,16 +22,22 @@ def output_PI_results(experiment):
     N_test = experiment['N_test']
     n_tau = experiment['n_tau']
     N_train = experiment['N_train']
+    L_test_attack = experiment['L_test_attack']
 
-    print('PINC = ',PINC)
+    print('PICP = ',PICP)
     print('Sharpness = ',SHARP)
     print('ACE = ', ACE)
     print('QS = ',QS)
     print('IS = ',IS)
 
+    # PIs = np.arange(0.1,1,0.1)
+    # plt.figure()
+    # plt.plot(PIs,PICP.T)
+    # plt.xlim(0,1)
+
     # plt.plot(PINC,SHARP)
     if print_cost:
-        plt.figure(0)
+        plt.figure()
         plt.plot(np.squeeze(costs))
         plt.ylabel('loss')
         plt.xlabel('epcoh')
@@ -39,7 +45,7 @@ def output_PI_results(experiment):
         # plt.yscale('log')
 
     if plot_results:
-        plt.figure(1)
+        plt.figure()
         x = (range(N_train,N_train+N_test))
         plt.plot(x,y_test, 'r*')
         n_PIs = n_tau // 2
@@ -49,4 +55,5 @@ def output_PI_results(experiment):
             plt.fill_between(x, y1, y2, color='blue', alpha=0.4) # alpha=str(1/n_PIs)
         plt.ylabel('Normalized Load')
         plt.xlabel('Time (hour)')
+        plt.plot(x,L_test_attack)
     return None

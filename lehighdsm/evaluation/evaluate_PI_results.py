@@ -20,13 +20,15 @@ def evaluate_PI_results(experiment):
     # calculate evaluation scores
     QS = quantileScore(q_hat, tau, n_tau, n_test, y_test)
     [IS, sharp_score, PINC] = intervalScore(q_hat, tau, n_tau, n_test, y_test)
-    ACE = coverageScore(q_hat, tau, n_tau, n_test, y_test)
+    ACE,PICP = coverageScore(q_hat, tau, n_tau, n_test, y_test)
 
     # save scores to dictionary and return
+    # Note: QS, IS, SHARP is normalized by alpha (max load)
     experiment['QS'] = QS/alpha
     experiment['IS'] = IS/alpha
     experiment['PINC'] = PINC
     experiment['ACE'] = ACE
+    experiment['PICP'] = PICP
     experiment['SHARP'] = sharp_score/alpha
 
     return experiment
@@ -73,7 +75,9 @@ def coverageScore(q_hat, tau, n_tau, n_test, y_test):
     # average q-scores from all PIs into a single score
     ACE = np.mean(ACE)
 
-    return ACE
+    # PICP = np.mean(PICP)
+
+    return ACE,PICP
 
 
 # ------------------------------------------------------------------------------
@@ -114,7 +118,7 @@ def intervalScore(q_hat, tau, n_tau, n_test, y_test):
 
     # average q-scores from all PIs into a single score
     interval_score = np.mean(interval_score)
-    sharp_score = np.mean(sharp_score)
+    # sharp_score = np.mean(sharp_score)
 
     return interval_score, sharp_score, PINC
 

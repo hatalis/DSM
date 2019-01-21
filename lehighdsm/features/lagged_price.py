@@ -21,7 +21,7 @@ def lagged_price(experiment):
     P = beta * ((alpha - L_processed) ** epsilon_P)
     Prices = pd.DataFrame(data={'P': np.ravel(P)})
 
-    experiment['Prices_SRIMA'] = Prices
+    experiment['Prices_SARIMA'] = Prices
 
     # create feature columns
     data = {}
