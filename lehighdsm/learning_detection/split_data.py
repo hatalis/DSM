@@ -11,14 +11,11 @@ def split_data(experiment, scaling = None):
     """
     # load in data from dictionary
     X = experiment['X']
-    experiment['scaling'] = scaling
-    L_processed = experiment['L_processed']
-    L_test_prediction = experiment['L_test_prediction']
-
+    y = experiment['y']
     N_test = experiment['N_test']
-    y = pd.DataFrame(data={'target': np.ravel(L_processed)})
 
     # combine covariates and labels, drop rows with NaN values; do the same thing for returns
+    y = pd.DataFrame(data={'target': np.ravel(y)})
     Xy = X.join(y, how='outer')
     Xy = Xy.dropna()
 
@@ -34,10 +31,7 @@ def split_data(experiment, scaling = None):
     X_train = X_train.values
     y_train = y_train.values
     X_test = X_test.values
-    y_test_true = y_test.values
-
-    y_test = L_test_prediction
-
+    y_test = y_test.values
 
     # apply scaling and convert scaled data back to pandas
     if scaling is not None:
@@ -51,7 +45,6 @@ def split_data(experiment, scaling = None):
     experiment['y_train'] = y_train
     experiment['X_test'] = X_test
     experiment['y_test'] = y_test
-    experiment['y_test_true'] = y_test_true
     experiment['split_index'] = split_index
     experiment['N_features'] = np.size(X_train, axis = 1)
 

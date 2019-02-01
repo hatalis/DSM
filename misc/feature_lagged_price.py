@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-def lagged_price(experiment):
+def feature_lagged_price(experiment):
     """
     Computes lagged price features.
 

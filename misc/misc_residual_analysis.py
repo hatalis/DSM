@@ -15,17 +15,18 @@ def residual_analysis(experiment):
     N_test = experiment['N_test']
     L_test_prediction = experiment['L_test_prediction']
     L_train_prediction = experiment['L_train_prediction']
-    L_train_actual = experiment['L_train_actual']
-    L_test_actual = experiment['L_test_actual']
+    L_train_true = experiment['L_train']
+    # L_test_true = experiment['L_test']
 
 
-    residual_train = L_train_actual - L_train_prediction
-    residual_test  = L_test_actual - L_test_prediction
-    residual_train = residual_train[48:]
-    var = residual_train.var()
-    mu = residual_train.mean()
-    sigma = residual_train.std()
-    residual_train = (residual_train-mu)/sigma
+    residual_train = L_train_true - L_train_prediction
+    # residual_test  = L_test_true - L_test_prediction
+    residual_train = residual_train[24:]
+
+    # var = residual_train.var()
+    # mu = residual_train.mean()
+    # sigma = residual_train.std()
+    # residual_train = (residual_train-mu)/sigma
 
     plt.figure()
     plt.plot(residual_train)
@@ -73,27 +74,27 @@ def residual_analysis(experiment):
 
 
 
-    print('\nAnalyzing TESTING residuals...')
-    print(' ADF Stationarity Test: ')
-    adf_result = adfuller(residual_test.ravel())
-    if (adf_result[1] <= 0.05):
-        print("     > The residuals are stationary.")
-    else:
-        print("     > The residuals are NOT stationary.")
-
-    print(' D’Agostino-Pearson Test: ')
-    DAP_result = stats.normaltest(residual_test.ravel())
-    if (DAP_result[1] <= 0.05):
-        print("     > The residuals are NOT Gaussian.")
-    else:
-        print("     > The residuals are Gaussian.")
-
-    print(' Jarque-Bera Test: ')
-    JB_result = stats.jarque_bera(residual_test)
-    if (JB_result[1] <= 0.05):
-        print("     > The residuals are NOT Gaussian.")
-    else:
-        print("     > The residuals are Gaussian.")
+    # print('\nAnalyzing TESTING residuals...')
+    # print(' ADF Stationarity Test: ')
+    # adf_result = adfuller(residual_test.ravel())
+    # if (adf_result[1] <= 0.05):
+    #     print("     > The residuals are stationary.")
+    # else:
+    #     print("     > The residuals are NOT stationary.")
+    #
+    # print(' D’Agostino-Pearson Test: ')
+    # DAP_result = stats.normaltest(residual_test.ravel())
+    # if (DAP_result[1] <= 0.05):
+    #     print("     > The residuals are NOT Gaussian.")
+    # else:
+    #     print("     > The residuals are Gaussian.")
+    #
+    # print(' Jarque-Bera Test: ')
+    # JB_result = stats.jarque_bera(residual_test)
+    # if (JB_result[1] <= 0.05):
+    #     print("     > The residuals are NOT Gaussian.")
+    # else:
+    #     print("     > The residuals are Gaussian.")
 
     # Running and interpreting a Ljung-Box test
     # ljung_box = smd.acorr_ljungbox(residual_train, lags=24)
@@ -107,8 +108,10 @@ def residual_analysis(experiment):
     # plot_acf(y_train, lags=48)
     # plot_pacf(y_test, lags=48)
 
-    plot_acf(residual_train-mu,lags=72)
-    plot_pacf(residual_train-mu, lags=72)
+    fig, axes = plt.subplots(2, 1)
+    plot_acf(residual_train, lags=48, ax=axes[0])
+    plot_pacf(residual_train, lags=48, ax=axes[1])
+
 
 
     # temp=zca_whitening(residual_train.T)
@@ -120,6 +123,7 @@ def residual_analysis(experiment):
     # plot_pacf(temp, lags=48)
 
     # Q-Q Plot
+    sigma = residual_train.std()
     plt.figure()
     plt.subplot(2, 1, 1)
     stats.probplot(residual_train.ravel(), dist="norm", plot=plt, sparams=(0, sigma))
@@ -127,12 +131,6 @@ def residual_analysis(experiment):
     plt.subplot(2, 1, 2)
     stats.probplot(residual_test.ravel(), dist="norm", plot=plt, sparams=(0, sigma))
     plt.title('Q-Q Plot of Test Residuals')
-
-
-
-
-
-
 
     return None
 

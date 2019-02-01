@@ -57,6 +57,90 @@ def simulate_load_price(experiment):
 
     N = experiment['N']
     phi = experiment['city'].values
+    epsilon_D = experiment['epsilon_D']
+    window = experiment['window']
+
+    method = experiment['method']
+    L_target = experiment['L_target']
+    kappa = experiment['kappa']
+    T = experiment['T']
+
+    goal = 0
+
+    L_target = 200
+    kappa = 0.0
+    T = 48
+
+
+    P = np.zeros((T,1))
+    L = np.zeros((T,N))
+    L_total = np.zeros((T,1))
+    L_hat = np.zeros((T, 1))
+    L_target = np.ones((T,1))*L_target
+
+    # attack parameters
+    # pa = 0.0
+    # attack, attack_prob, = [0, 1], [1-pa, pa]
+    # attack_outcome = np.random.choice(attack, size=[T,N], p=attack_prob)
+
+    attack = np.zeros((T,1))
+    for t in range(23,T):
+        attack[t] = attack[t-1] + 10
+
+    # attack[24] = 250
+    # attack[30] = 200
+    # attack[46] = 300
+
+    Phi_Total = np.sum(phi,axis = 1)[:T]
+    L_total[0] = Phi_Total[0]
+    for t in range(1,T):
+        # 1. DEFINE PRICE
+        if t > window:
+            # L_hat[t] = load_forecast(t, L_total[:t], P[:t], method, window)
+
+            L_adjusted = L_target[t] + goal*(L_target[t-1]-L_total[t-1])
+            if L_adjusted < 0:
+                L_adjusted = 10# L_target[t]
+            P[t] = (L_adjusted/Phi_Total[t-1])**(1/epsilon_D)
+
+            # P[t] = (L_target[t] / Phi_Total[t]) ** (1 / epsilon_D)
+
+        # 2. DEFINE LOAD
+        L[t, :] =  kappa*(phi[t, :]*(P[t]**epsilon_D)) + (1 - kappa) * phi[t, :]
+
+        # # random attack
+        # amount = 0.00
+        # L[t, :] = L[t, :] * (1+attack_outcome[t, :]*amount)
+        # # attack on midnight
+        # if t % 24 == 0:
+        #     L[t, :] = L[t, :] * 0
+
+        # if total load > alpha, shed load
+        L_total[t] = np.sum(L[t, :])
+        # if L_total[t] > alpha:
+        #     L_total[t] = alpha-1
+        L_total[t] = L_total[t]  + attack[t]
+
+    print('kappa = ', kappa)
+    print('goal = ',goal)
+    print('L_target = ', np.mean(L_target))
+    print('Mean L = ', np.mean(L_total))
+
+    experiment['Phi_Total'] = Phi_Total
+    experiment['L_target'] = L_target
+    experiment['P'] = P/100 # convert cents to USD
+    experiment['L'] = L
+    experiment['L_total'] = L_total
+    experiment['L_hat'] = L_hat
+    experiment['attack'] = attack
+    return experiment
+
+'''
+# OLD MODEL
+def simulate_load_price(experiment):
+
+    N = experiment['N']
+    phi = experiment['city'].values
     alpha = experiment['alpha']
     epsilon_D = experiment['epsilon_D']
     epsilon_P = experiment['epsilon_P']
@@ -71,6 +155,7 @@ def simulate_load_price(experiment):
 
     # plot_acf(total_load.diff(periods=1).values[1:], alpha=0.05, lags=48)
     # plt.show()
+
 
     P_target = L_hat_period/L_target
     if epsilon_P == None:
@@ -113,7 +198,6 @@ def simulate_load_price(experiment):
     for t in range(window,T):
         P_perfect[t] = beta * ((alpha - L_total[t])**epsilon_P)
 
-
     experiment['P_target'] = P_target
     experiment['L_target'] = L_target
     experiment['epsilon_P'] = epsilon_P
@@ -124,7 +208,7 @@ def simulate_load_price(experiment):
     experiment['P_perfect'] = P_perfect
 
     return experiment
-
+'''
 
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 def load_forecast(t, L_total, P, method, window):
@@ -150,35 +234,71 @@ def load_forecast(t, L_total, P, method, window):
 
     return L_hat
 
+
+
 from sklearn.metrics import mean_squared_error
 def output_results(experiment):
 
+    Phi_Total = experiment['Phi_Total']
     L_total = experiment['L_total']
     L_target = experiment['L_target']
     L_hat = experiment['L_hat']
-    epsilon_P = experiment['epsilon_P']
-    P = experiment['P'] / 100
-    P_target = experiment['P_target']/100
-    P_perfect = experiment['P_perfect']/100
+    P = experiment['P']
+    # P_target = experiment['P_target']/100
+    # P_perfect = experiment['P_perfect']/100
     window = experiment['window']
+    attack = experiment['attack']
 
-    print('=========================')
-    print('Target Load = {:,.2f}'.format(np.mean(L_target)))
-    print('Actual Load = {:,.2f}'.format(np.mean(L_total)))
-    print('RMSE of Load Forecast vs Observed = ',np.sqrt(mean_squared_error(L_total[window:], L_hat[window:])))
-    print('=========================')
+    # print('=========================')
+    # print('Target Load = {:,.2f}'.format(np.mean(L_target)))
+    # print('Actual Load = {:,.2f}'.format(np.mean(L_total)))
+    # print('RMSE of Load Forecast vs Observed = ',np.sqrt(mean_squared_error(L_total[window:], L_hat[window:])))
+    # print('=========================')
     # print('Target Price = {:,.4f}'.format(P_target))
     # print('Elasticity of Price = {:,.2f}'.format(epsilon_P))
-    print('Mean RTP = = {:,.4f}'.format(np.mean(P)))
-    print('RMSE of RTP vs Ideal Price = ',np.sqrt(mean_squared_error(P_perfect[window:], P[window:])))
-    print('=========================')
+    # print('Mean RTP = = {:,.4f}'.format(np.mean(P)))
+    # print('RMSE of RTP vs Ideal Price = ',np.sqrt(mean_squared_error(P_perfect[window:], P[window:])))
+    # print('=========================')
 
-    plt.figure(figsize=(9,6))
+    '''
+    Plot attack
+    '''
+    plt.figure(figsize=(4.5,6.5))
+    plt.subplot(211)
+    plt.plot(attack, color='red')
+    plt.ylabel('Attack Level')
+    plt.grid(alpha=0.4)
+
+
+    plt.tight_layout()
+    plt.subplot(212)
+    plt.subplots_adjust(bottom=0.1)
+    plt.plot(L_total,'red')
+    plt.plot(Phi_Total,'black')
+
+
+    plt.xlabel('Time (hr)')
+    plt.ylabel('Total Load (kWh)')
+    plt.ylim(1, 1_000)
+
+
+
+    plt.legend(['Attacked Load','Nominal Load'],fancybox=True,framealpha=1.0,
+               shadow=True,ncol=2,loc='upper center', bbox_to_anchor=(0.5, 1.01))
+    #  plt.axvline(x=window, color='black')
+
+    plt.grid(alpha=0.4)
+
+
+
+
+
+
+    plt.figure(figsize=(4.5,6.5))
     plt.subplot(211)
     plt.plot(P, color='darkorange')
-    # plt.plot(P_perfect, color='purple')
     plt.ylabel('Price (USD/kWh)')
-
+    plt.grid(alpha=0.4)
     # plt.legend(['Estimated Price','Ideal Price'],fancybox=True,framealpha=1.0,
     #            shadow=True,ncol=3,loc='upper center', bbox_to_anchor=(0.5, 1.08))
     # plt.ylim(0, 0.08)
@@ -186,7 +306,6 @@ def output_results(experiment):
     # plt.title('Elasticity of price = {:,.2f}'.format(epsilon_P))
     # plt.axhline(y=P_target, color='r')
     # plt.axhline(y=np.mean(P), linestyle='--', color='green')
-
     # plt.subplots_adjust(hspace=10)
     # plt.subplots_adjust(left=0.15)
 
@@ -194,16 +313,18 @@ def output_results(experiment):
     plt.subplot(212)
     plt.subplots_adjust(bottom=0.1)
     plt.plot(L_total)
-    # plt.plot(L_hat)
+    plt.plot(Phi_Total,'black')
+    # plt.plot(L_target, 'red')
     plt.xlabel('Time (hr)')
     plt.ylabel('Total Load (kWh)')
     plt.ylim(1, 1_000)
 
-    # plt.axhline(y=L_target, color='r')
-    # plt.axhline(y=np.mean(L_total), linestyle='--', color='blue')
-
-    # plt.legend(['Observed Load','Target Load','Mean Load'],fancybox=True,framealpha=1.0,
-    #            shadow=True,ncol=3,loc='upper center', bbox_to_anchor=(0.5, 1.01))
-    #
+    plt.axhline(y=np.mean(L_target), color='r')
+    plt.axhline(y=np.mean(L_total), linestyle='--', color='blue')
+    plt.legend(['Observed Load','Base Load','Target Load','Mean Load'],fancybox=True,framealpha=1.0,
+               shadow=True,ncol=2,loc='upper center', bbox_to_anchor=(0.5, 1.01))
     #  plt.axvline(x=window, color='black')
+
+    plt.grid(alpha=0.4)
+
     return None

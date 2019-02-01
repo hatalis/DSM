@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-def lagged_load(experiment):
+def feature_lagged_load(experiment, name_start = 'L_lag_', L = None):
     """
     Computes lagged load features
 
@@ -12,19 +12,14 @@ def lagged_load(experiment):
     Returns:
         experiment(dict): Experiment dictionary with additional or updated key: X
     """
-    L_processed = experiment['L_processed']
-    n = experiment['lags']
-    Load = pd.DataFrame(data = {'L': np.ravel(L_processed)})
+    lags = experiment['lags']
+    Load = pd.DataFrame(data = {'L': np.ravel(L)})
 
     # create feature columns
     data = {}
-    if n > 0:
-        for i in range(1, n+1):
-            name = 'L_lag_'+str(i)
-            data[name] = Load['L'].shift(periods=i)
-    else:
-        print('Error: lags must be greater then 0!')
-
+    for i in range(lags):
+        name = name_start+str(i)
+        data[name] = Load['L'].shift(periods=i)
     feature = pd.DataFrame(data)
 
     try:
